@@ -1,16 +1,31 @@
-from typing import Union
+import os
+from typing import Union, List
+from concurrent.futures import ThreadPoolExecutor
+import requests
 
 from PySide6.QtGui import QPixmap, QImage, QResizeEvent
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+
+from pytube import YouTube
 
 THUMBNAIL_WIDTH_PX = 8 * 16
 THUMBNAIL_HEIGHT_PX = 8 * 9
 THUMBNAIL_MARGIN_PX = 5
 
 
+def get_thumbnail_url(yt: YouTube) -> str:
+    """
+    YouTube.thumbnail_url takes about 3 seconds on my machine to complete the first time.
+    This function allows it to be put in a thread pool.
+    """
+    return yt.thumbnail_url
+
+
 class ThumbnailGallery(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
+
+        self.current_tag = ""
 
         self.vertical_layout = QVBoxLayout(self)
         self.vertical_layout.setSpacing(THUMBNAIL_MARGIN_PX)
@@ -33,6 +48,8 @@ class ThumbnailGallery(QWidget):
 
         # Clear main layout
         while item := self.vertical_layout.takeAt(0):
+            w = item.widget()
+            del w
             del item
 
         for i, thumbnail in enumerate(self.thumbnails):
@@ -48,6 +65,30 @@ class ThumbnailGallery(QWidget):
         thumbnail.setFixedWidth(THUMBNAIL_WIDTH_PX)
         thumbnail.setFixedHeight(THUMBNAIL_HEIGHT_PX)
         self.thumbnails.append(thumbnail)
+
+    def add_thumbnails_from_urls(self, urls: List[str]) -> None:
+        with ThreadPoolExecutor(max_workers=min(10, len(urls))) as p:
+            youtubes = [YouTube(url) for url in urls]
+            thumbnail_urls = p.map(get_thumbnail_url, youtubes)
+            thumbnails = p.map(self._download_thumbnail, thumbnail_urls)
+        for thumbnail in thumbnails:
+            self.add_thumbnail(thumbnail)
+
+    def _download_thumbnail(self, url: str) -> QPixmap:
+        YOUTUBE_LOGO_FNAME = "yt_logo.jpg"
+        try:
+            r = requests.get(url)
+            fname = url.split("/")[-1]
+            open(fname, "wb").write(r.content)
+            pix = QPixmap(fname)
+            os.remove(fname)
+        except Exception as e:
+            print(e)
+            pix = QPixmap(YOUTUBE_LOGO_FNAME)
+        return pix
+
+    def clear_thumbnails(self):
+        self.thumbnails = []
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         # There is more tolerance on the minimum, because the QScrollArea stops resizing its child

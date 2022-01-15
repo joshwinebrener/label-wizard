@@ -1,6 +1,5 @@
 import requests
 import csv
-from pprint import pprint
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread
 
@@ -73,8 +72,6 @@ class YouTube8mClient(object):
 
             self.last_id_accessed[tag] += len(names)
             urls.extend([self.YOUTUBE_TEMPLATE_URL + name for name in names])
-
-        pprint(list(zip(ids[0:10], urls)))
 
         return urls
 
