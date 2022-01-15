@@ -1,5 +1,8 @@
+from threading import Thread
+
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import QWidget, QLineEdit, QPushButton, QHBoxLayout, QCompleter
+
 from youtube_8m import YouTube8mClient
 
 
@@ -9,10 +12,8 @@ class LabelPicker(QWidget):
 
         self.yt8m_client = yt8m_client
 
-        self.completer = QCompleter(self.yt8m_client.labels.keys())
-        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.completer = None
         self.label_picker = QLineEdit()
-        self.label_picker.setCompleter(self.completer)
         self.label_picker.setPlaceholderText("YouTube video label")
         self.submit_button = QPushButton("submit")
 
@@ -21,13 +22,33 @@ class LabelPicker(QWidget):
         self.layout.addWidget(self.submit_button)
 
         self.label_picker.returnPressed.connect(self.submit_label)
+        self.label_picker.textEdited.connect(self.check_labels_fetched)
         self.submit_button.clicked.connect(self.submit_label)
+
+        self.fetch_thread = Thread(target=self.yt8m_client.fetch_labels)
+        self.fetch_thread.start()
+
+    @Slot()
+    def check_labels_fetched(self):
+        if self.fetch_thread.is_alive():
+            return
+
+        if self.completer is None:
+            self.completer = QCompleter(self.yt8m_client.labels)
+            self.completer.setCaseSensitivity(Qt.CaseInsensitive)
+            self.label_picker.setCompleter(self.completer)
 
     @Slot()
     def submit_label(self):
+        if self.fetch_thread.is_alive():
+            self.fetch_thread.join()
+
         label = self.label_picker.text()
         if label in self.yt8m_client.labels:
             tag = self.yt8m_client.labels[label][0]
-            self.yt8m_client.fetch_next_ten_urls_for_tag(tag)
+            self.fetch_thread = Thread(
+                target=self.yt8m_client.fetch_next_ten_urls_for_tag, args=(tag,)
+            )
+            self.fetch_thread.start()
         else:
             print("not a valid label")

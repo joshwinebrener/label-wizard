@@ -1,7 +1,8 @@
 import requests
 import csv
 from pprint import pprint
-from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
 
 from requests.models import DEFAULT_REDIRECT_LIMIT
 
@@ -21,11 +22,11 @@ class YouTube8mClient(object):
 
     def __init__(self):
         self.requests_session = requests.Session()
-        self.labels = self._get_available_labels()
+        self.labels = []
         self.urls = []
         self.last_id_accessed = {}
 
-    def _get_available_labels(self):
+    def fetch_labels(self):
         try:
             r = self.requests_session.get(self.LABELS_CSV_URL)
         except ConnectionError:
@@ -39,6 +40,7 @@ class YouTube8mClient(object):
             if row:
                 labels[row[2]] = (row[1], row[0])
 
+        self.labels = labels
         return labels
 
     def fetch_next_ten_urls_for_tag(self, tag):
@@ -62,7 +64,7 @@ class YouTube8mClient(object):
         while len(urls) < NUM_URLS_TO_FETCH:
             remaining = NUM_URLS_TO_FETCH - len(urls)
 
-            with Pool(remaining) as p:
+            with ThreadPoolExecutor(max_workers=remaining) as p:
                 names = p.map(
                     self.get_yt_link_from_id,
                     ids[self.last_id_accessed[tag] : self.last_id_accessed[tag] + remaining],
@@ -77,7 +79,7 @@ class YouTube8mClient(object):
         return urls
 
     def get_yt_link_from_id(self, id):
-        r = requests.get(f"{self.ID_TO_VIDEO_URL}{id[0:2]}/{id}.js")
+        r = self.requests_session.get(f"{self.ID_TO_VIDEO_URL}{id[0:2]}/{id}.js")
         responses = r.text.replace("i(", "").replace(");", "").replace('"', "").split(",")
 
         if len(responses) > 1:
