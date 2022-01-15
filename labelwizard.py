@@ -1,6 +1,6 @@
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import QApplication, QSplitter, QHBoxLayout, QWidget
 from widgets.video_selection_panel import VideoSelectionPanel
 from widgets.video_player import VideoPlayer
@@ -21,8 +21,15 @@ class MyWidget(QWidget):
         self.splitter.addWidget(self.video_selection_panel)
         self.splitter.addWidget(self.frame_sweeper)
 
+        # Only stretch the left side when the window is resized
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
+
         self.layout = QHBoxLayout(self)
         self.layout.addWidget(self.splitter)
+
+    def sizeHint(self) -> QSize:
+        return QSize(800, 600)
 
 
 if __name__ == "__main__":
