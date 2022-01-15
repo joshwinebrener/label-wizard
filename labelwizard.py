@@ -1,18 +1,9 @@
 import sys
 
-from PySide6.QtCore import QLine, Qt, Slot
-from PySide6.QtGui import QDropEvent
-from PySide6.QtWidgets import (
-    QApplication,
-    QCompleter,
-    QLabel,
-    QComboBox,
-    QLineEdit,
-    QPushButton,
-    QHBoxLayout,
-    QWidget,
-)
-
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QSplitter, QHBoxLayout, QWidget
+from widgets.video_selection_panel import VideoSelectionPanel
+from widgets.video_player import VideoPlayer
 
 from youtube_8m import YouTube8mClient
 
@@ -23,28 +14,15 @@ class MyWidget(QWidget):
 
         self.yt8m_client = YouTube8mClient()
 
-        self.completer = QCompleter(self.yt8m_client.labels.keys())
-        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.label_picker = QLineEdit()
-        self.label_picker.setCompleter(self.completer)
-        self.label_picker.setPlaceholderText("YouTube video label")
-        self.submit_button = QPushButton("submit")
+        self.video_selection_panel = VideoSelectionPanel(self.yt8m_client, self)
+        self.frame_sweeper = VideoPlayer(self)
+
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.addWidget(self.video_selection_panel)
+        self.splitter.addWidget(self.frame_sweeper)
 
         self.layout = QHBoxLayout(self)
-        self.layout.addWidget(self.label_picker)
-        self.layout.addWidget(self.submit_button)
-
-        self.label_picker.returnPressed.connect(self.submit_label)
-        self.submit_button.clicked.connect(self.submit_label)
-
-    @Slot()
-    def submit_label(self):
-        label = self.label_picker.text()
-        if label in self.yt8m_client.labels:
-            tag = self.yt8m_client.labels[label][0]
-            self.yt8m_client.fetch_next_ten_urls_for_tag(tag)
-        else:
-            print("not a valid label")
+        self.layout.addWidget(self.splitter)
 
 
 if __name__ == "__main__":
