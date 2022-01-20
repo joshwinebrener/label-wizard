@@ -24,13 +24,15 @@ class VideoSelectionPanel(QWidget):
         self.vertical_layout.addWidget(self.label_picker)
         self.vertical_layout.addWidget(self.thumbnail_scroll)
 
+        self.label_picker.fetching_urls.connect(self.clear_thumbnail_gallery)
         self.label_picker.urls_ready.connect(self.handle_new_urls)
 
     @Slot()
-    def handle_new_urls(self, tag, urls):
-        if tag != self.thumbnail_gallery.current_tag:
-            self.thumbnail_gallery.clear_thumbnails()
-            self.thumbnail_gallery.current_tag = tag
+    def clear_thumbnail_gallery(self, tag):
+        self.thumbnail_gallery.begin_loading_tag(tag)
+
+    @Slot()
+    def handle_new_urls(self, urls):
         self.thumbnail_gallery.add_thumbnails_from_urls(urls)
         self.thumbnail_gallery.render_thumbnails()
 
@@ -48,4 +50,7 @@ class VerticalScrollArea(QScrollArea):
             self.setMinimumWidth(
                 self.widget().minimumSizeHint().width() + self.verticalScrollBar().width()
             )
+
+        # TODO: fetch more when the user scrolls to the bottom of the widget.
+
         return super().eventFilter(o, e)

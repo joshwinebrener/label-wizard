@@ -76,7 +76,7 @@ class YouTube8mClient(object):
         return urls
 
     def get_yt_link_from_id(self, id):
-        r = self.requests_session.get(f"{self.ID_TO_VIDEO_URL}{id[0:2]}/{id}.js")
+        r = self.requests_session.get(f"{self.ID_TO_VIDEO_URL}{id[0:2]}/{id}.js", timeout=5)
         responses = r.text.replace("i(", "").replace(");", "").replace('"', "").split(",")
 
         if len(responses) > 1:

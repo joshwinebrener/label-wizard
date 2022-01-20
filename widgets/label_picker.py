@@ -7,7 +7,8 @@ from youtube_8m import YouTube8mClient
 
 
 class LabelPicker(QWidget):
-    urls_ready = Signal(str, list)
+    urls_ready = Signal(list)
+    fetching_urls = Signal(str)
 
     def __init__(self, yt8m_client: YouTube8mClient, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
@@ -31,8 +32,9 @@ class LabelPicker(QWidget):
         self.fetch_thread.start()
 
     def fetch_next_ten_urls_for_tag(self, tag):
+        self.fetching_urls.emit(tag)
         urls = self.yt8m_client.fetch_next_ten_urls_for_tag(tag)
-        self.urls_ready.emit(tag, urls)
+        self.urls_ready.emit(urls)
 
     @Slot()
     def check_labels_fetched(self):
