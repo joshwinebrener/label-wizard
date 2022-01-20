@@ -14,6 +14,7 @@ class LabelPicker(QWidget):
         QWidget.__init__(self, *args, **kwargs)
 
         self.yt8m_client = yt8m_client
+        self.tag = ""
 
         self.completer = None
         self.label_picker = QLineEdit()
@@ -31,7 +32,15 @@ class LabelPicker(QWidget):
         self.fetch_thread = Thread(target=self.yt8m_client.fetch_labels)
         self.fetch_thread.start()
 
-    def fetch_next_ten_urls_for_tag(self, tag):
+    def fetch_next_ten_urls_for_tag(self, tag=None):
+        if tag is None:
+            if self.tag:
+                tag = self.tag
+            else:
+                return
+        else:
+            self.tag = tag
+
         self.fetching_urls.emit(tag)
         urls = self.yt8m_client.fetch_next_ten_urls_for_tag(tag)
         self.urls_ready.emit(urls)

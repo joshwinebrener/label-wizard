@@ -1,4 +1,5 @@
-from PySide6.QtCore import Qt, QObject, QEvent, Slot
+from tkinter import Scrollbar
+from PySide6.QtCore import Qt, QObject, QEvent, Signal, Slot
 from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
@@ -24,11 +25,12 @@ class VideoSelectionPanel(QWidget):
         self.vertical_layout.addWidget(self.label_picker)
         self.vertical_layout.addWidget(self.thumbnail_scroll)
 
-        self.label_picker.fetching_urls.connect(self.clear_thumbnail_gallery)
+        self.label_picker.fetching_urls.connect(self.load_tag)
         self.label_picker.urls_ready.connect(self.handle_new_urls)
+        self.thumbnail_scroll.reached_bottom.connect(self.label_picker.fetch_next_ten_urls_for_tag)
 
     @Slot()
-    def clear_thumbnail_gallery(self, tag):
+    def load_tag(self, tag):
         self.thumbnail_gallery.begin_loading_tag(tag)
 
     @Slot()
@@ -38,6 +40,8 @@ class VideoSelectionPanel(QWidget):
 
 
 class VerticalScrollArea(QScrollArea):
+    reached_bottom = Signal()
+
     def __init__(self, *args, **kwargs):
         QScrollArea.__init__(self, *args, **kwargs)
 
@@ -51,6 +55,11 @@ class VerticalScrollArea(QScrollArea):
                 self.widget().minimumSizeHint().width() + self.verticalScrollBar().width()
             )
 
-        # TODO: fetch more when the user scrolls to the bottom of the widget.
+        # Signal to fetch more thumbnails when user scrolls to bottom
+        if (
+            e.type() == QEvent.Wheel
+            and self.verticalScrollBar().value() == self.verticalScrollBar().maximum()
+        ):
+            self.reached_bottom.emit()
 
         return super().eventFilter(o, e)
