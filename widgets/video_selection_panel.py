@@ -46,7 +46,7 @@ class VerticalScrollArea(QScrollArea):
         QScrollArea.__init__(self, *args, **kwargs)
 
         self.setWidgetResizable(True)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
     def eventFilter(self, o: QObject, e: QEvent) -> bool:

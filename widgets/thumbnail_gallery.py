@@ -51,6 +51,7 @@ class ThumbnailGallery(QWidget):
         # Clear main layout
         while item := self.vertical_layout.takeAt(0):
             w = item.widget()
+            w.hide()
             del w, item
 
         for i, thumbnail in enumerate(self.thumbnails):
@@ -108,17 +109,17 @@ class ThumbnailGallery(QWidget):
         self.loading_indicator.show()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
-        # There is more tolerance on the minimum, because the QScrollArea stops resizing its child
-        # at the true minimum
-        min_width_before_rerender = 2 * THUMBNAIL_MARGIN_PX + (self.num_columns) * (
-            THUMBNAIL_WIDTH_PX + THUMBNAIL_MARGIN_PX
+        min_width_before_rerender = (
+            THUMBNAIL_MARGIN_PX
+            + (self.num_columns) * (THUMBNAIL_WIDTH_PX + THUMBNAIL_MARGIN_PX)
+            + 1
         )
         max_width_before_rerender = THUMBNAIL_MARGIN_PX + (self.num_columns + 1) * (
             THUMBNAIL_WIDTH_PX + THUMBNAIL_MARGIN_PX
         )
         w = event.size().width()
 
-        if not (min_width_before_rerender < event.size().width() < max_width_before_rerender):
+        if not (min_width_before_rerender < w < max_width_before_rerender):
             columns = (w - 2 * THUMBNAIL_MARGIN_PX) // (THUMBNAIL_WIDTH_PX + THUMBNAIL_MARGIN_PX)
             self.render_thumbnails(max(columns, 1))
 
