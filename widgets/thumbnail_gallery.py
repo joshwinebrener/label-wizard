@@ -1,14 +1,14 @@
-from ast import Load
 import random
 import time
 import os
 from typing import Union, List
 from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
 import requests
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QPixmap, QImage, QResizeEvent, QMovie
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PySide6.QtCore import QSize, Qt, Signal, Slot
+from PySide6.QtGui import QPixmap, QImage, QResizeEvent, QMovie, QIcon
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 
 from pytube import YouTube
 
@@ -18,13 +18,17 @@ THUMBNAIL_MARGIN_PX = 5
 
 
 class ThumbnailGallery(QWidget):
+    video_selected = Signal(YouTube)
+    thumbnails_ready = Signal()
+
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
 
         self.current_tag = ""
+        self.busy = False
 
-        self.loading_indicator = LoadingIndicator(self)
-        self.loading_indicator.hide()
+        # self.loading_indicator = LoadingIndicator(self)
+        # self.loading_indicator.hide()
 
         self.vertical_layout = QVBoxLayout(self)
         self.vertical_layout.setSpacing(THUMBNAIL_MARGIN_PX)
@@ -42,6 +46,9 @@ class ThumbnailGallery(QWidget):
 
         random.seed(int(time.time()))
 
+        self.thumbnails_ready.connect(self.render_thumbnails)
+
+    @Slot()
     def render_thumbnails(self, columns=None):
         if columns == self.num_columns:
             return
@@ -54,30 +61,30 @@ class ThumbnailGallery(QWidget):
             w.hide()
             del w, item
 
-        for i, thumbnail in enumerate(self.thumbnails):
+        for i, (pixmap, yt) in enumerate(self.thumbnails):
+            thumbnail = Thumbnail(pixmap, yt)
+            # yt=thumbnail.yt is a hack to prevent yt from referring to the last yt value
+            thumbnail.clicked.connect(lambda *_, yt=thumbnail.yt: self.video_selected.emit(yt))
+
             if i % self.num_columns == 0:
                 row = ThumbnailRow()
                 self.vertical_layout.addWidget(row)
             row.add_thumbnail(thumbnail)
 
-    def add_thumbnail(self, pixmap: Union[QPixmap, QImage]):
-        thumbnail = QLabel()
-        thumbnail.setPixmap(pixmap)
-        thumbnail.setScaledContents(True)
-        thumbnail.setFixedWidth(THUMBNAIL_WIDTH_PX)
-        thumbnail.setFixedHeight(THUMBNAIL_HEIGHT_PX)
-        self.thumbnails.append(thumbnail)
-
-    def add_thumbnails_from_urls(self, urls: List[str]) -> None:
+    def _add_thumbnails_from_urls(self, urls: List[str]) -> None:
         youtubes = [YouTube(url) for url in urls]
         with ThreadPoolExecutor(max_workers=min(10, len(urls))) as p:
-            thumbnails = p.map(self._download_thumbnail, youtubes)
+            thumbnail_imgs = p.map(self._download_thumbnail, youtubes)
 
-        self.vertical_layout.removeWidget(self.loading_indicator)
-        self.loading_indicator.hide()
+        # self.vertical_layout.removeWidget(self.loading_indicator)
+        # self.loading_indicator.hide()
 
-        for thumbnail in thumbnails:
-            self.add_thumbnail(thumbnail)
+        self.thumbnails.extend(list(zip(thumbnail_imgs, youtubes)))
+        self.thumbnails_ready.emit()
+
+    def add_thumbnails_from_urls(self, urls: List[str]) -> None:
+        t = Thread(target=self._add_thumbnails_from_urls, args=(urls,))
+        t.start()
 
     def _download_thumbnail(self, yt: YouTube) -> QPixmap:
         url = yt.thumbnail_url
@@ -104,9 +111,9 @@ class ThumbnailGallery(QWidget):
             self.clear_thumbnails()
             self.current_tag = tag
 
-        self.vertical_layout.addWidget(self.loading_indicator)
-        self.vertical_layout.setAlignment(self.loading_indicator, Qt.AlignHCenter)
-        self.loading_indicator.show()
+        # self.vertical_layout.addWidget(self.loading_indicator)
+        # self.vertical_layout.setAlignment(self.loading_indicator, Qt.AlignHCenter)
+        # self.loading_indicator.show()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         min_width_before_rerender = (
@@ -126,24 +133,18 @@ class ThumbnailGallery(QWidget):
         return super().resizeEvent(event)
 
 
-class LoadingIndicator(QLabel):
-    def __init__(self, *args, **kwargs):
-        QLabel.__init__(self, *args, **kwargs)
+class Thumbnail(QPushButton):
+    def __init__(self, pixmap: QPixmap, yt: YouTube, *args, **kwargs):
+        QPushButton.__init__(self, *args, **kwargs)
 
-        gif = QMovie("loading.gif")
-        self.setMovie(gif)
-        gif.start()
+        self.yt = yt
 
-        self.setMaximumHeight(30)
-        self.setMaximumWidth(30)
-
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        rect = self.geometry()
-        size = QSize(min(rect.width(), rect.height()), min(rect.width(), rect.height()))
-
-        self.movie().setScaledSize(size)
-
-        return super().resizeEvent(event)
+        icon = QIcon(pixmap)
+        self.setIcon(icon)
+        self.setFlat(True)
+        # Set the icon bigger than the button, and it will be downscaled to exactly the right size
+        self.setIconSize(QSize(2 * THUMBNAIL_WIDTH_PX, 2 * THUMBNAIL_HEIGHT_PX))
+        self.setFixedSize(QSize(THUMBNAIL_WIDTH_PX, THUMBNAIL_HEIGHT_PX))
 
 
 class ThumbnailRow(QWidget):

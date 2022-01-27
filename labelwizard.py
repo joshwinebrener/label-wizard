@@ -28,6 +28,10 @@ class MyWidget(QWidget):
         self.layout = QHBoxLayout(self)
         self.layout.addWidget(self.splitter)
 
+        self.video_selection_panel.thumbnail_gallery.video_selected.connect(
+            self.frame_sweeper.load_video
+        )
+
     def sizeHint(self) -> QSize:
         return QSize(800, 600)
 

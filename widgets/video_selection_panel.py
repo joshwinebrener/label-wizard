@@ -27,7 +27,9 @@ class VideoSelectionPanel(QWidget):
 
         self.label_picker.fetching_urls.connect(self.load_tag)
         self.label_picker.urls_ready.connect(self.handle_new_urls)
-        self.thumbnail_scroll.reached_bottom.connect(self.label_picker.fetch_next_ten_urls_for_tag)
+        # Removed because it would load 4 or 5 times (stalling the ui) when the user scrolled to the bottom
+        # self.thumbnail_scroll.reached_bottom.connect(self.label_picker.fetch_next_ten_urls_for_tag)
+        self.thumbnail_gallery.thumbnails_ready.connect(self.label_picker.loading.hide)
 
     @Slot()
     def load_tag(self, tag):
@@ -36,7 +38,6 @@ class VideoSelectionPanel(QWidget):
     @Slot()
     def handle_new_urls(self, urls):
         self.thumbnail_gallery.add_thumbnails_from_urls(urls)
-        self.thumbnail_gallery.render_thumbnails()
 
 
 class VerticalScrollArea(QScrollArea):

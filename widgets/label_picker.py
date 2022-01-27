@@ -1,7 +1,15 @@
 from threading import Thread
 
 from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import QWidget, QLineEdit, QPushButton, QHBoxLayout, QCompleter
+from PySide6.QtWidgets import (
+    QWidget,
+    QLineEdit,
+    QPushButton,
+    QHBoxLayout,
+    QVBoxLayout,
+    QCompleter,
+    QProgressBar,
+)
 
 from youtube_8m import YouTube8mClient
 
@@ -21,18 +29,33 @@ class LabelPicker(QWidget):
         self.label_picker.setPlaceholderText("YouTube video label")
         self.submit_button = QPushButton("submit")
 
-        self.layout = QHBoxLayout(self)
-        self.layout.addWidget(self.label_picker)
-        self.layout.addWidget(self.submit_button)
+        self.horizontal_layout = QHBoxLayout()
+        self.horizontal_layout.addWidget(self.label_picker)
+        self.horizontal_layout.addWidget(self.submit_button)
+
+        self.loading = QProgressBar()
+        self.loading.setRange(0, 0)
+
+        self.vertical_layout = QVBoxLayout(self)
+        self.vertical_layout.addLayout(self.horizontal_layout)
+        self.vertical_layout.addWidget(self.loading)
+        self.setLayout(self.vertical_layout)
 
         self.label_picker.returnPressed.connect(self.submit_label)
         self.label_picker.textEdited.connect(self.check_labels_fetched)
         self.submit_button.clicked.connect(self.submit_label)
 
-        self.fetch_thread = Thread(target=self.yt8m_client.fetch_labels)
+        self.fetch_thread = Thread(target=self._fetch_labels)
         self.fetch_thread.start()
 
+    def _fetch_labels(self):
+        self.loading.show()
+        self.yt8m_client.fetch_labels()
+        self.loading.hide()
+
     def fetch_next_ten_urls_for_tag(self, tag=None):
+        self.loading.show()
+
         if tag is None:
             if self.tag:
                 tag = self.tag
