@@ -17,6 +17,7 @@ from youtube_8m import YouTube8mClient
 class LabelPicker(QWidget):
     urls_ready = Signal(list)
     fetching_urls = Signal(str)
+    labels_fetched = Signal()
 
     def __init__(self, yt8m_client: YouTube8mClient, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
@@ -24,9 +25,11 @@ class LabelPicker(QWidget):
         self.yt8m_client = yt8m_client
         self.tag = ""
 
-        self.completer = None
+        self.completer = QCompleter([])
+        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.label_picker = QLineEdit()
         self.label_picker.setPlaceholderText("YouTube video label")
+        self.label_picker.setCompleter(self.completer)
         self.submit_button = QPushButton("submit")
 
         self.horizontal_layout = QHBoxLayout()
@@ -44,6 +47,7 @@ class LabelPicker(QWidget):
         self.label_picker.returnPressed.connect(self.submit_label)
         self.label_picker.textEdited.connect(self.check_labels_fetched)
         self.submit_button.clicked.connect(self.submit_label)
+        self.labels_fetched.connect(self._show_popup_if_text_entered)
 
         self.fetch_thread = Thread(target=self._fetch_labels)
         self.fetch_thread.start()
@@ -51,7 +55,13 @@ class LabelPicker(QWidget):
     def _fetch_labels(self):
         self.loading.show()
         self.yt8m_client.fetch_labels()
+        self.labels_fetched.emit()
         self.loading.hide()
+
+    def _show_popup_if_text_entered(self):
+        self.label_picker.completer().model().setStringList(self.yt8m_client.labels)
+        if self.label_picker.text() != "":
+            self.label_picker.completer().complete()
 
     def fetch_next_ten_urls_for_tag(self, tag=None):
         self.loading.show()
@@ -74,9 +84,10 @@ class LabelPicker(QWidget):
             return
 
         if self.completer is None:
-            self.completer = QCompleter(self.yt8m_client.labels)
-            self.completer.setCaseSensitivity(Qt.CaseInsensitive)
-            self.label_picker.setCompleter(self.completer)
+            self.label_picker.completer().model().setStringList(self.yt8m_client.labels)
+            # self.completer = QCompleter(self.yt8m_client.labels)
+            # self.completer.setCaseSensitivity(Qt.CaseInsensitive)
+            # self.label_picker.setCompleter(self.completer)
 
     @Slot()
     def submit_label(self):

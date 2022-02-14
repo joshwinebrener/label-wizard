@@ -1,9 +1,11 @@
 import sys
+import glob
+import os
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import QApplication, QSplitter, QHBoxLayout, QWidget
 from widgets.video_selection_panel import VideoSelectionPanel
-from widgets.video_player import VideoPlayer
+from widgets.video_player import VideoPlayer, FNAME_PREFIX
 
 from youtube_8m import YouTube8mClient
 
@@ -42,4 +44,9 @@ if __name__ == "__main__":
     widget = MyWidget()
     widget.show()
 
-    sys.exit(app.exec())
+    return_value = app.exec()
+
+    for fname in glob.glob(f"./{FNAME_PREFIX}*.mp4"):
+        os.remove(fname)
+
+    sys.exit(return_value)

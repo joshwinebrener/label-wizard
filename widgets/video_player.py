@@ -1,12 +1,11 @@
 import os
 import time
 from threading import Thread
-from xml.dom.minidom import Attr
 
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtMultimediaWidgets import QVideoWidget, QGraphicsVideoItem
 from PySide6.QtCore import Qt, Signal, Slot, QRectF, QPointF, QUrl, QSize
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QCloseEvent
 from PySide6.QtWidgets import (
     QWidget,
     QSlider,
@@ -17,8 +16,11 @@ from PySide6.QtWidgets import (
 )
 
 from pytube import YouTube
+from pytube.exceptions import VideoPrivate
 
 from widgets.aspect_ratio_pixmap_label import AspectRatioPixmapLabel
+
+FNAME_PREFIX = "yt_download_"
 
 
 class VideoPlayer(QWidget):
@@ -49,7 +51,7 @@ class VideoPlayer(QWidget):
 
         try:
             audio_video_streams = yt.streams.filter(progressive=True)
-        except AttributeError as e:
+        except (AttributeError, VideoPrivate) as e:
             print(e)
             self.loading.hide()
             return
@@ -67,22 +69,20 @@ class VideoPlayer(QWidget):
             self.loading.hide()
             return
 
-        i = 0
-        while os.path.exists(f"{os.getcwd()}/{i}.mp4"):
-            i += 1
-        fname = f"{os.getcwd()}/{i}.mp4"
-        fsize_mb = chosen_stream.filesize_approx // (1024 * 1024)
-        self.loading.setRange(0, fsize_mb)
-        t = Thread(
-            target=chosen_stream.download,
-            kwargs={"filename": fname, "skip_existing": False},
-        )
-        t.start()
-        while t.is_alive():
-            time.sleep(0.1)
-            if os.path.exists(fname):
-                self.file_size_changed.emit(os.path.getsize(fname) // (1024 * 1024))
-        t.join()
+        fname = f"{os.getcwd()}/{FNAME_PREFIX}{yt.watch_url.split('=')[1]}.mp4"
+        if not os.path.exists(fname):
+            fsize_mb = chosen_stream.filesize_approx // (1024 * 1024)
+            self.loading.setRange(0, fsize_mb)
+            t = Thread(
+                target=chosen_stream.download,
+                kwargs={"filename": fname, "skip_existing": False},
+            )
+            t.start()
+            while t.is_alive():
+                time.sleep(0.1)
+                if os.path.exists(fname):
+                    self.file_size_changed.emit(os.path.getsize(fname) // (1024 * 1024))
+            t.join()
         self.loading.hide()
 
         self.video_downloaded.emit(fname)
@@ -142,5 +142,4 @@ class VideoWindow(QWidget):
         self.media_player.stop()
 
     def clear(self):
-        if os.path.exists(self.fname) and self.fname != self.DEFAULT_FNAME:
-            os.remove(self.fname)
+        pass
