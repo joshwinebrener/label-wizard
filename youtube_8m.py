@@ -1,7 +1,6 @@
 import requests
 import csv
 from concurrent.futures import ThreadPoolExecutor
-from threading import Thread
 
 from requests.models import DEFAULT_REDIRECT_LIMIT
 

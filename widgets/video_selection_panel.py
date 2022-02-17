@@ -1,4 +1,3 @@
-from tkinter import Scrollbar
 from PySide6.QtCore import Qt, QObject, QEvent, Signal, Slot
 from PySide6.QtWidgets import (
     QScrollArea,

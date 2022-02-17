@@ -3,14 +3,13 @@ import time
 from threading import Thread
 
 from PySide6.QtMultimedia import QMediaPlayer
-from PySide6.QtMultimediaWidgets import QVideoWidget, QGraphicsVideoItem
-from PySide6.QtCore import Qt, Signal, Slot, QRectF, QPointF, QUrl, QSize, QTimer
-from PySide6.QtGui import QPixmap, QCloseEvent, QPainter, QResizeEvent
+from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
+from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSize, QTimer
+from PySide6.QtGui import QPainter, QResizeEvent
 from PySide6.QtWidgets import (
     QWidget,
     QSlider,
     QVBoxLayout,
-    QBoxLayout,
     QSizePolicy,
     QProgressBar,
     QGraphicsView,
@@ -20,7 +19,6 @@ from PySide6.QtWidgets import (
 from pytube import YouTube
 from pytube.exceptions import VideoPrivate
 
-from widgets.aspect_ratio_pixmap_label import AspectRatioPixmapLabel
 
 FNAME_PREFIX = "yt_download_"
 
@@ -57,17 +55,17 @@ class VideoPlayer(QWidget):
 
     @Slot()
     def _jump_to_position(self, val):
-        current_pos = self.video_window.media_player.position()
-        dur = self.video_window.media_player.duration()
+        current_pos = self.video_window.position
+        dur = self.video_window.duration
         new_pos = val / 1000 * dur
         increment = dur / 1000
         if not -increment < current_pos - new_pos < increment:
-            self.video_window.media_player.setPosition(new_pos)
+            self.video_window.set_position(new_pos)
 
     @Slot()
     def _update_playhead(self):
-        pos = self.video_window.media_player.position()
-        dur = self.video_window.media_player.duration()
+        pos = self.video_window.position
+        dur = self.video_window.duration
         playhead = int(1000 * pos / dur if dur else 0)
         self.slider.setValue(playhead)
 
@@ -153,6 +151,17 @@ class VideoWindow(QWidget):
         self.setLayout(self.vertical_layout)
 
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    @property
+    def duration(self):
+        return self.media_player.duration()
+
+    @property
+    def position(self):
+        return self.media_player.position()
+
+    def set_position(self, new_pos):
+        self.media_player.setPosition(new_pos)
 
     def load(self, fname: str):
         self.fname = fname

@@ -85,9 +85,6 @@ class LabelPicker(QWidget):
 
         if self.completer is None:
             self.label_picker.completer().model().setStringList(self.yt8m_client.labels)
-            # self.completer = QCompleter(self.yt8m_client.labels)
-            # self.completer.setCaseSensitivity(Qt.CaseInsensitive)
-            # self.label_picker.setCompleter(self.completer)
 
     @Slot()
     def submit_label(self):

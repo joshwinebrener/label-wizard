@@ -1,6 +1,4 @@
 import sys
-import glob
-import os
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import QApplication, QSplitter, QHBoxLayout, QWidget

@@ -1,14 +1,14 @@
 import random
 import time
 import os
-from typing import Union, List
+from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread
 import requests
 
 from PySide6.QtCore import QSize, Qt, Signal, Slot
-from PySide6.QtGui import QPixmap, QImage, QResizeEvent, QMovie, QIcon
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PySide6.QtGui import QPixmap, QResizeEvent, QIcon
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton
 
 from pytube import YouTube
 
@@ -27,9 +27,6 @@ class ThumbnailGallery(QWidget):
         self.current_tag = ""
         self.busy = False
 
-        # self.loading_indicator = LoadingIndicator(self)
-        # self.loading_indicator.hide()
-
         self.vertical_layout = QVBoxLayout(self)
         self.vertical_layout.setSpacing(THUMBNAIL_MARGIN_PX)
         self.vertical_layout.setContentsMargins(
@@ -40,8 +37,6 @@ class ThumbnailGallery(QWidget):
         self.thumbnails = []
         self.num_columns = 1
 
-        # for _ in range(50):
-        #     self.add_thumbnail(QPixmap("puppy.jpeg"))
         self.render_thumbnails()
 
         random.seed(int(time.time()))
@@ -76,9 +71,6 @@ class ThumbnailGallery(QWidget):
         with ThreadPoolExecutor(max_workers=min(10, len(urls))) as p:
             thumbnail_imgs = p.map(self._download_thumbnail, youtubes)
 
-        # self.vertical_layout.removeWidget(self.loading_indicator)
-        # self.loading_indicator.hide()
-
         self.thumbnails.extend(list(zip(thumbnail_imgs, youtubes)))
         self.thumbnails_ready.emit()
 
@@ -110,10 +102,6 @@ class ThumbnailGallery(QWidget):
         if tag != self.current_tag:
             self.clear_thumbnails()
             self.current_tag = tag
-
-        # self.vertical_layout.addWidget(self.loading_indicator)
-        # self.vertical_layout.setAlignment(self.loading_indicator, Qt.AlignHCenter)
-        # self.loading_indicator.show()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         min_width_before_rerender = (
