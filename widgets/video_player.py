@@ -309,7 +309,11 @@ class DrawableGraphicsScene(QGraphicsScene):
                     br = rect.boundingRect()
                     x = event.scenePos().x()
                     y = event.scenePos().y()
-                    if br.x() < x < br.x() + br.width() and br.y() < y < br.y() + br.height():
+                    l = min(br.x(), br.x() + br.width())
+                    r = max(br.x(), br.x() + br.width())
+                    t = min(br.y(), br.y() + br.height())
+                    b = max(br.y(), br.y() + br.height())
+                    if l < x < r and t < y < b:
                         to_remove.append((label, i))
             to_remove.reverse()
             for (label, i) in to_remove:
