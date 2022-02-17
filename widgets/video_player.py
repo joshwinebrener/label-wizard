@@ -4,12 +4,14 @@ from threading import Thread
 
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtMultimediaWidgets import QVideoWidget, QGraphicsVideoItem
-from PySide6.QtCore import Qt, Signal, Slot, QRectF, QPointF, QUrl, QSize
-from PySide6.QtGui import QPixmap, QCloseEvent
+from PySide6.QtCore import Qt, Signal, Slot, QRectF, QPointF, QUrl, QSize, QTimer
+from PySide6.QtGui import QPixmap, QCloseEvent, QPainter, QResizeEvent
 from PySide6.QtWidgets import (
     QWidget,
     QSlider,
     QVBoxLayout,
+    QBoxLayout,
+    QSizePolicy,
     QProgressBar,
     QGraphicsView,
     QGraphicsScene,
@@ -33,6 +35,8 @@ class VideoPlayer(QWidget):
         self.video_window = VideoWindow()
         self.slider = QSlider()
         self.slider.setOrientation(Qt.Orientation.Horizontal)
+        self.slider.setMinimum(0)
+        self.slider.setMaximum(1000)
         self.loading = QProgressBar(self)
         self.loading.setRange(0, 0)
         self.loading.hide()
@@ -40,11 +44,32 @@ class VideoPlayer(QWidget):
         self.main_layout.addWidget(self.video_window)
         self.main_layout.addWidget(self.slider)
         self.main_layout.addWidget(self.loading)
-        self.main_layout.addStretch()
         self.setLayout(self.main_layout)
 
+        self.timer = QTimer()
+        self.timer.setInterval(15)
+        self.timer.start()
+
+        self.timer.timeout.connect(self._update_playhead)
         self.file_size_changed.connect(self._file_size_change)
         self.video_downloaded.connect(self.set_video_source)
+        self.slider.sliderMoved.connect(self._jump_to_position)
+
+    @Slot()
+    def _jump_to_position(self, val):
+        current_pos = self.video_window.media_player.position()
+        dur = self.video_window.media_player.duration()
+        new_pos = val / 1000 * dur
+        increment = dur / 1000
+        if not -increment < current_pos - new_pos < increment:
+            self.video_window.media_player.setPosition(new_pos)
+
+    @Slot()
+    def _update_playhead(self):
+        pos = self.video_window.media_player.position()
+        dur = self.video_window.media_player.duration()
+        playhead = int(1000 * pos / dur if dur else 0)
+        self.slider.setValue(playhead)
 
     def _load_video(self, yt: YouTube):
         self.loading.show()
@@ -104,26 +129,30 @@ class VideoPlayer(QWidget):
 
 
 class VideoWindow(QWidget):
-    DEFAULT_FNAME = "./yt_logo.jpg"
-
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
 
-        self.fname = self.DEFAULT_FNAME
+        self.fname = None
 
-        self.video_widget = QVideoWidget()
-        self.video_widget.show()
-        self.video_widget.setMinimumSize(QSize(100, 100))
+        self.video_graphics = QGraphicsVideoItem()
+        self.video_graphics.setAspectRatioMode(Qt.KeepAspectRatio)
+        self.scene = QGraphicsScene(self)
+        self.scene.addItem(self.video_graphics)
+        self.scene.setBackgroundBrush(Qt.white)
+        self.view = QGraphicsView(self.scene)
+        self.view.setRenderHint(QPainter.Antialiasing, True)
+        self.view.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         self.media_player = QMediaPlayer()
-        self.media_player.setVideoOutput(self.video_widget)
+        self.media_player.setVideoOutput(self.video_graphics)
 
         self.vertical_layout = QVBoxLayout()
-        self.vertical_layout.addWidget(self.video_widget)
+        self.vertical_layout.addWidget(self.view)
         self.setLayout(self.vertical_layout)
 
-        self.load(self.fname)
-        self.play()
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def load(self, fname: str):
         self.fname = fname
@@ -131,6 +160,7 @@ class VideoWindow(QWidget):
             self.stop()
         url = QUrl.fromLocalFile(fname)
         self.media_player.setSource(url)
+        self.resizeEvent(QResizeEvent(QSize(self.size()), QSize(self.size())))
 
     def play(self):
         self.media_player.play()
@@ -143,3 +173,26 @@ class VideoWindow(QWidget):
 
     def clear(self):
         pass
+
+    # def sizeHint(self) -> QSize:
+    #     aspect_ratio = self.video_graphics.size().width() / self.video_graphics.size().height()
+    #     w = self.size().width()
+    #     h = w / aspect_ratio
+    #     return QSize(w, h)
+    #     # return super().sizeHint()
+
+    def resizeEvent(self, event):
+        self.view.fitInView(self.video_graphics, Qt.KeepAspectRatio)
+        # print(self.view.size())
+        # aspect_ratio = self.video_graphics.size().width() / self.video_graphics.size().height()
+        # delta = max(
+        #     abs(event.oldSize().width() - event.size().width()),
+        #     abs(event.oldSize().height() - event.size().height()),
+        # )
+        # self.setMinimumSize(
+        #     event.size().width() - delta, event.size().width() / aspect_ratio - delta
+        # )
+        # self.setMaximumSize(
+        #     event.size().width() + delta, event.size().width() / aspect_ratio + delta
+        # )
+        return super().resizeEvent(event)
