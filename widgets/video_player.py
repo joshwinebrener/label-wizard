@@ -1,14 +1,18 @@
 import os
 import time
 from threading import Thread
-from xml.sax.handler import property_interning_dict
+import math
 
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
 from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSize, QTimer
-from PySide6.QtGui import QPainter, QResizeEvent, QKeyEvent, QIcon
+from PySide6.QtGui import QPainter, QResizeEvent, QKeyEvent, QIcon, QMouseEvent, QColor, QFont
 from PySide6.QtWidgets import (
+    QGraphicsRectItem,
+    QComboBox,
+    QGraphicsTextItem,
     QLabel,
+    QGraphicsSceneMouseEvent,
     QWidget,
     QPushButton,
     QSlider,
@@ -27,6 +31,10 @@ from pytube.exceptions import VideoPrivate
 FNAME_PREFIX = "yt_download_"
 
 
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+
 class VideoPlayer(QWidget):
     file_size_changed = Signal(int)
     video_downloaded = Signal(str)
@@ -34,9 +42,15 @@ class VideoPlayer(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
 
-        self.video_window = VideoWindow()
         # Theme names from here:
-        # https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.htm
+        # https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
+        self.load_labels_button = QPushButton(
+            QIcon.fromTheme("system-file-manager"), "load labels file"
+        )
+        self.label_selector = QComboBox()
+        self.label_selector.addItems(["chicken", "fox", "housepet"])
+        self.save_button = QPushButton(QIcon.fromTheme("document-save"), "save bounding boxes")
+        self.video_window = VideoWindow()
         self.seek_backward_button = QPushButton(QIcon.fromTheme("media-seek-backward"), "")
         self.play_button = QPushButton(QIcon.fromTheme("media-playback-start"), "")
         self.seek_forward_button = QPushButton(QIcon.fromTheme("media-seek-forward"), "")
@@ -52,12 +66,18 @@ class VideoPlayer(QWidget):
         self.loading.setRange(0, 0)
         self.loading.hide()
 
+        self.menu_bar = QHBoxLayout()
+        self.menu_bar.addWidget(self.load_labels_button)
+        self.menu_bar.addWidget(self.label_selector)
+        self.menu_bar.addStretch()
+        self.menu_bar.addWidget(self.save_button)
         self.playhead_layout = QHBoxLayout()
         self.playhead_layout.addWidget(self.seek_backward_button)
         self.playhead_layout.addWidget(self.play_button)
         self.playhead_layout.addWidget(self.seek_forward_button)
         self.playhead_layout.addWidget(self.slider)
         self.main_layout = QVBoxLayout(self)
+        self.main_layout.addLayout(self.menu_bar)
         self.main_layout.addWidget(self.video_window)
         self.main_layout.addWidget(self.instructions_label)
         self.main_layout.addLayout(self.playhead_layout)
@@ -192,7 +212,7 @@ class VideoWindow(QWidget):
 
         self.video_graphics = QGraphicsVideoItem()
         self.video_graphics.setAspectRatioMode(Qt.KeepAspectRatio)
-        self.scene = QGraphicsScene(self)
+        self.scene = DrawableGraphicsScene(self)
         self.scene.addItem(self.video_graphics)
         self.scene.setBackgroundBrush(Qt.white)
         self.view = QGraphicsView(self.scene)
@@ -227,7 +247,7 @@ class VideoWindow(QWidget):
             self.stop()
         url = QUrl.fromLocalFile(fname)
         self.media_player.setSource(url)
-        self.resizeEvent(QResizeEvent(QSize(self.size()), QSize(self.size())))
+        self.view.fitInView(self.video_graphics, Qt.KeepAspectRatio)
 
     def play(self):
         self.media_player.play()
@@ -248,25 +268,97 @@ class VideoWindow(QWidget):
     def clear(self):
         pass
 
-    # def sizeHint(self) -> QSize:
-    #     aspect_ratio = self.video_graphics.size().width() / self.video_graphics.size().height()
-    #     w = self.size().width()
-    #     h = w / aspect_ratio
-    #     return QSize(w, h)
-    #     # return super().sizeHint()
-
     def resizeEvent(self, event):
         self.view.fitInView(self.video_graphics, Qt.KeepAspectRatio)
-        # print(self.view.size())
-        # aspect_ratio = self.video_graphics.size().width() / self.video_graphics.size().height()
-        # delta = max(
-        #     abs(event.oldSize().width() - event.size().width()),
-        #     abs(event.oldSize().height() - event.size().height()),
-        # )
-        # self.setMinimumSize(
-        #     event.size().width() - delta, event.size().width() / aspect_ratio - delta
-        # )
-        # self.setMaximumSize(
-        #     event.size().width() + delta, event.size().width() / aspect_ratio + delta
-        # )
         return super().resizeEvent(event)
+
+
+class DrawableGraphicsScene(QGraphicsScene):
+    def __init__(self, *args, **kwargs):
+        QGraphicsScene.__init__(self, *args, **kwargs)
+        self.rectangles = {}
+        self.markers = {}
+        self.click_point = None
+        self.current_label = "chicken"
+        self.unique_color = None
+
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        if event.button() == Qt.LeftButton:
+            self.click_point = event.scenePos()
+            next_rect = QGraphicsRectItem(self.click_point.x(), self.click_point.y(), 0, 0)
+            r = sigmoid(hash(self.current_label) / (1 << 63)) * 255
+            g = sigmoid(hash(self.current_label[1:] + self.current_label[0]) / (1 << 63)) * 255
+            b = sigmoid(hash(self.current_label[2:] + self.current_label[0:2]) / (1 << 63)) * 255
+            brightness = math.sqrt(r * r + g * g + b * b)
+            self.unique_color = QColor(
+                r / brightness * 255,
+                g / brightness * 255,
+                b / brightness * 255,
+                255,
+            )
+            next_rect.setPen(self.unique_color)
+            if self.current_label not in self.rectangles or not self.rectangles[self.current_label]:
+                self.rectangles[self.current_label] = []
+            self.rectangles[self.current_label].append(next_rect)
+            self.addItem(self.rectangles[self.current_label][-1])
+
+        elif event.button() == Qt.RightButton:
+            to_remove = []
+            for label in self.rectangles:
+                for i, rect in enumerate(self.rectangles[label]):
+                    br = rect.boundingRect()
+                    x = event.scenePos().x()
+                    y = event.scenePos().y()
+                    if br.x() < x < br.x() + br.width() and br.y() < y < br.y() + br.height():
+                        to_remove.append((label, i))
+            to_remove.reverse()
+            for (label, i) in to_remove:
+                self.removeItem(self.rectangles[label][i])
+                self.rectangles[label].pop(i)
+                self.removeItem(self.markers[label][i])
+                self.markers[label].pop(i)
+
+        return super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        if self.click_point is not None:
+            self.rectangles[self.current_label][-1].setRect(
+                self.click_point.x(),
+                self.click_point.y(),
+                event.scenePos().x() - self.click_point.x(),
+                event.scenePos().y() - self.click_point.y(),
+            )
+
+        return super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        if event.button() == Qt.LeftButton:
+            if (
+                abs(event.scenePos().x() - self.click_point.x()) < 10
+                and abs(event.scenePos().y() - self.click_point.y()) < 10
+            ):
+                self.removeItem(self.rectangles[self.current_label][-1])
+                self.rectangles[self.current_label].pop(-1)
+            else:
+                if self.current_label not in self.markers or not self.markers[self.current_label]:
+                    self.markers[self.current_label] = []
+                top_left_x = min(
+                    self.rectangles[self.current_label][-1].rect().x(),
+                    self.rectangles[self.current_label][-1].rect().x()
+                    + self.rectangles[self.current_label][-1].rect().width(),
+                )
+                top_left_y = min(
+                    self.rectangles[self.current_label][-1].rect().y(),
+                    self.rectangles[self.current_label][-1].rect().y()
+                    + self.rectangles[self.current_label][-1].rect().height(),
+                )
+                text = QGraphicsTextItem(self.current_label)
+                self.markers[self.current_label].append(text)
+                self.markers[self.current_label][-1].setDefaultTextColor(self.unique_color)
+                self.markers[self.current_label][-1].setPos(top_left_x, top_left_y)
+                self.markers[self.current_label][-1].setFont(QFont("Roboto", 3))
+                self.addItem(self.markers[self.current_label][-1])
+
+        self.click_point = None
+
+        return super().mouseReleaseEvent(event)
