@@ -1,4 +1,6 @@
 import sys
+import glob
+import os
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import QApplication, QSplitter, QHBoxLayout, QWidget
@@ -44,8 +46,7 @@ if __name__ == "__main__":
 
     return_value = app.exec()
 
-    # TODO: restore this to delete videos when finished
-    # for fname in glob.glob(f"./{FNAME_PREFIX}*.mp4"):
-    #     os.remove(fname)
+    for fname in glob.glob(f"./{FNAME_PREFIX}*.mp4"):
+        os.remove(fname)
 
     sys.exit(return_value)

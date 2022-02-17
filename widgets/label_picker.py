@@ -28,7 +28,7 @@ class LabelPicker(QWidget):
         self.completer = QCompleter([])
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.label_picker = QLineEdit()
-        self.label_picker.setPlaceholderText("YouTube video label")
+        self.label_picker.setPlaceholderText("video category")
         self.label_picker.setCompleter(self.completer)
         self.submit_button = QPushButton("submit")
 

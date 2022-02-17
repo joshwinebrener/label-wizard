@@ -1,15 +1,19 @@
 import os
 import time
 from threading import Thread
+from xml.sax.handler import property_interning_dict
 
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
 from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSize, QTimer
-from PySide6.QtGui import QPainter, QResizeEvent
+from PySide6.QtGui import QPainter, QResizeEvent, QKeyEvent, QIcon
 from PySide6.QtWidgets import (
+    QLabel,
     QWidget,
+    QPushButton,
     QSlider,
     QVBoxLayout,
+    QHBoxLayout,
     QSizePolicy,
     QProgressBar,
     QGraphicsView,
@@ -31,16 +35,32 @@ class VideoPlayer(QWidget):
         QWidget.__init__(self, *args, **kwargs)
 
         self.video_window = VideoWindow()
+        # Theme names from here:
+        # https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.htm
+        self.seek_backward_button = QPushButton(QIcon.fromTheme("media-seek-backward"), "")
+        self.play_button = QPushButton(QIcon.fromTheme("media-playback-start"), "")
+        self.seek_forward_button = QPushButton(QIcon.fromTheme("media-seek-forward"), "")
         self.slider = QSlider()
         self.slider.setOrientation(Qt.Orientation.Horizontal)
         self.slider.setMinimum(0)
         self.slider.setMaximum(1000)
+        self.instructions_label = QLabel(
+            "j: back 10s, k/SPACE: play/pause, l: forward 10s, <: back 1 frame, >: forward 1 frame"
+        )
+        self.instructions_label.setWordWrap(True)
         self.loading = QProgressBar(self)
         self.loading.setRange(0, 0)
         self.loading.hide()
+
+        self.playhead_layout = QHBoxLayout()
+        self.playhead_layout.addWidget(self.seek_backward_button)
+        self.playhead_layout.addWidget(self.play_button)
+        self.playhead_layout.addWidget(self.seek_forward_button)
+        self.playhead_layout.addWidget(self.slider)
         self.main_layout = QVBoxLayout(self)
         self.main_layout.addWidget(self.video_window)
-        self.main_layout.addWidget(self.slider)
+        self.main_layout.addWidget(self.instructions_label)
+        self.main_layout.addLayout(self.playhead_layout)
         self.main_layout.addWidget(self.loading)
         self.setLayout(self.main_layout)
 
@@ -52,6 +72,23 @@ class VideoPlayer(QWidget):
         self.file_size_changed.connect(self._file_size_change)
         self.video_downloaded.connect(self.set_video_source)
         self.slider.sliderMoved.connect(self._jump_to_position)
+        self.seek_backward_button.clicked.connect(self.seek_backward)
+        self.play_button.clicked.connect(self.pause_play)
+        self.seek_forward_button.clicked.connect(self.seek_forward)
+
+    def pause_play(self):
+        if self.video_window.paused:
+            self.play_button.setIcon(QIcon.fromTheme("media-playback-pause"))
+            self.video_window.play()
+        else:
+            self.play_button.setIcon(QIcon.fromTheme("media-playback-start"))
+            self.video_window.pause()
+
+    def seek_forward(self):
+        self.video_window.set_position(self.video_window.position + 10_000)
+
+    def seek_backward(self):
+        self.video_window.set_position(self.video_window.position - 10_000)
 
     @Slot()
     def _jump_to_position(self, val):
@@ -114,7 +151,10 @@ class VideoPlayer(QWidget):
     def set_video_source(self, fname: str):
         self.video_window.clear()
         self.video_window.load(fname)
+
+        # Show the first frame, but keep the video paused
         self.video_window.play()
+        self.video_window.pause()
 
     @Slot()
     def _file_size_change(self, size: int):
@@ -124,6 +164,24 @@ class VideoPlayer(QWidget):
         self.loading.setRange(0, 0)
         t = Thread(target=self._load_video, args=(yt,))
         t.start()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if event.text() == " ":
+            self.pause_play()
+        elif event.text() == "j":
+            self.seek_backward()
+        elif event.text() == "k":
+            self.pause_play()
+        elif event.text() == "l":
+            self.seek_forward()
+        elif event.text() == "<":
+            # Skip backward 30ms, or about one frame
+            self.video_window.set_position(self.video_window.position - 15)
+        elif event.text() == ">":
+            # Skip forward 30ms, or about one frame
+            self.video_window.set_position(self.video_window.position + 15)
+
+        return super().keyPressEvent(event)
 
 
 class VideoWindow(QWidget):
@@ -173,6 +231,13 @@ class VideoWindow(QWidget):
 
     def play(self):
         self.media_player.play()
+
+    @property
+    def paused(self):
+        return self.media_player.playbackState() in [
+            QMediaPlayer.PausedState,
+            QMediaPlayer.StoppedState,
+        ]
 
     def pause(self):
         self.media_player.pause()
