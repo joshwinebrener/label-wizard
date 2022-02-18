@@ -30,7 +30,6 @@ from PySide6.QtWidgets import (
 import cv2
 import yaml
 from pytube import YouTube
-from pytube.exceptions import VideoPrivate
 
 
 FNAME_PREFIX = "yt_download_"
@@ -199,7 +198,7 @@ Right-click to remove a bounding box"""
 
         try:
             audio_video_streams = yt.streams.filter(progressive=True)
-        except (AttributeError, VideoPrivate) as e:
+        except Exception as e:
             print(e)
             self.loading.hide()
             return

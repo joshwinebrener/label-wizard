@@ -5,10 +5,17 @@ Downloads YouTube videos to annotate with bounding boxes for object detection.
 ![alt text](https://github.com/joshwinebrener/label-wizard/blob/master/screenshot.png?raw=true)
 
 - [Label-Wizard](#label-wizard)
+  - [Intalling requirements](#intalling-requirements)
   - [Running](#running)
   - [Building](#building)
   - [Known Issues](#known-issues)
     - [PyTube Error `'NoneType' object has no attribute 'span'](#pytube-error-nonetype-object-has-no-attribute-span)
+
+## Intalling requirements
+
+```
+pip install -r requirements.txt
+```
 
 ## Running
 
