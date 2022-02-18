@@ -1,4 +1,5 @@
 import os
+import pwd
 import time
 from threading import Thread
 import math
@@ -10,6 +11,8 @@ from PySide6.QtGui import QPainter, QResizeEvent, QKeyEvent, QIcon, QMouseEvent,
 from PySide6.QtWidgets import (
     QGraphicsRectItem,
     QComboBox,
+    QMessageBox,
+    QFileDialog,
     QGraphicsTextItem,
     QLabel,
     QGraphicsSceneMouseEvent,
@@ -23,6 +26,8 @@ from PySide6.QtWidgets import (
     QGraphicsView,
     QGraphicsScene,
 )
+
+import yaml
 
 from pytube import YouTube
 from pytube.exceptions import VideoPrivate
@@ -42,14 +47,16 @@ class VideoPlayer(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
 
+        self.custom_data_yaml_file = None
+
         # Theme names from here:
         # https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
         self.load_labels_button = QPushButton(
             QIcon.fromTheme("system-file-manager"), "load labels file"
         )
         self.label_selector = QComboBox()
-        self.label_selector.addItems(["chicken", "fox", "housepet"])
         self.save_button = QPushButton(QIcon.fromTheme("document-save"), "save bounding boxes")
+        self.help_button = QPushButton(QIcon.fromTheme("help-about"), "help")
         self.video_window = VideoWindow()
         self.seek_backward_button = QPushButton(QIcon.fromTheme("media-seek-backward"), "")
         self.play_button = QPushButton(QIcon.fromTheme("media-playback-start"), "")
@@ -58,10 +65,6 @@ class VideoPlayer(QWidget):
         self.slider.setOrientation(Qt.Orientation.Horizontal)
         self.slider.setMinimum(0)
         self.slider.setMaximum(1000)
-        self.instructions_label = QLabel(
-            "j: back 10s, k/SPACE: play/pause, l: forward 10s, <: back 1 frame, >: forward 1 frame"
-        )
-        self.instructions_label.setWordWrap(True)
         self.loading = QProgressBar(self)
         self.loading.setRange(0, 0)
         self.loading.hide()
@@ -71,6 +74,7 @@ class VideoPlayer(QWidget):
         self.menu_bar.addWidget(self.label_selector)
         self.menu_bar.addStretch()
         self.menu_bar.addWidget(self.save_button)
+        self.menu_bar.addWidget(self.help_button)
         self.playhead_layout = QHBoxLayout()
         self.playhead_layout.addWidget(self.seek_backward_button)
         self.playhead_layout.addWidget(self.play_button)
@@ -79,7 +83,6 @@ class VideoPlayer(QWidget):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.addLayout(self.menu_bar)
         self.main_layout.addWidget(self.video_window)
-        self.main_layout.addWidget(self.instructions_label)
         self.main_layout.addLayout(self.playhead_layout)
         self.main_layout.addWidget(self.loading)
         self.setLayout(self.main_layout)
@@ -88,6 +91,18 @@ class VideoPlayer(QWidget):
         self.timer.setInterval(15)
         self.timer.start()
 
+        self.file_dialog = QFileDialog(filter="YAML files (*.yaml *.yml)")
+        self.help_dialog = QMessageBox(
+            text="""j: back 10s
+k/SPACE: play/pause
+l: forward 10s
+<: back 1 frame
+>: forward 1 frame
+
+Left-click to place a bounding box
+Right-click to remove a bounding box"""
+        )
+
         self.timer.timeout.connect(self._update_playhead)
         self.file_size_changed.connect(self._file_size_change)
         self.video_downloaded.connect(self.set_video_source)
@@ -95,6 +110,52 @@ class VideoPlayer(QWidget):
         self.seek_backward_button.clicked.connect(self.seek_backward)
         self.play_button.clicked.connect(self.pause_play)
         self.seek_forward_button.clicked.connect(self.seek_forward)
+        self.load_labels_button.clicked.connect(self.file_dialog.show)
+        self.file_dialog.fileSelected.connect(self.load_labels_file)
+        self.label_selector.currentTextChanged.connect(self.set_current_label)
+        self.help_button.clicked.connect(self.help_dialog.show)
+        self.save_button.clicked.connect(self.save_bounding_boxes)
+
+    @Slot()
+    def set_current_label(self, label):
+        for i in range(self.label_selector.count()):
+            if label == self.label_selector.itemText(i):
+                self.video_window.scene.current_label = label
+                break
+
+    @Slot()
+    def load_labels_file(self, fname):
+        self.custom_data_yaml_file = fname
+        custom_data = None
+        with open(fname, "r") as f:
+            custom_data = yaml.safe_load(f)
+        if custom_data is not None and "names" in custom_data:
+            self.label_selector.clear()
+            self.label_selector.addItems(custom_data["names"])
+
+    @Slot()
+    def save_bounding_boxes(self):
+        labels = []
+        for i in range(self.label_selector.count()):
+            labels.append(self.label_selector.itemText(i))
+
+        uname = pwd.getpwuid(os.getuid())[0]
+        fname = f"{uname}_{time.strftime('%Y%m%d_%H-%M-%S')}"
+        with open(fname + ".txt", "w") as f:
+            for label in self.video_window.scene.rectangles:
+                label_id = -1
+                if label in labels:
+                    label_id = labels.index(label)
+                else:
+                    continue
+                for rect in self.video_window.scene.rectangles[label]:
+                    l = min(rect.rect().x(), rect.rect().x() + rect.rect().width())
+                    r = max(rect.rect().x(), rect.rect().x() + rect.rect().width())
+                    t = min(rect.rect().y(), rect.rect().y() + rect.rect().height())
+                    b = max(rect.rect().y(), rect.rect().y() + rect.rect().height())
+                    f.writelines([f"{label_id} {l} {t} {r} {b}\n"])
+
+        print(uname)
 
     def pause_play(self):
         if self.video_window.paused:
