@@ -47,6 +47,7 @@ class VideoPlayer(QWidget):
         QWidget.__init__(self, *args, **kwargs)
 
         self.custom_data_yaml_file = None
+        self.output_folder = None
 
         # Theme names from here:
         # https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
@@ -54,6 +55,9 @@ class VideoPlayer(QWidget):
             QIcon.fromTheme("system-file-manager"), "load labels file"
         )
         self.label_selector = QComboBox()
+        self.open_folder_button = QPushButton(
+            QIcon.fromTheme("system-file-manager"), "load output folder"
+        )
         self.save_button = QPushButton(QIcon.fromTheme("document-save"), "save bounding boxes")
         self.help_button = QPushButton(QIcon.fromTheme("help-about"), "help")
         self.video_window = VideoWindow()
@@ -90,7 +94,7 @@ class VideoPlayer(QWidget):
         self.timer.setInterval(15)
         self.timer.start()
 
-        self.file_dialog = QFileDialog(filter="YAML files (*.yaml *.yml)")
+        self.yaml_dialog = QFileDialog(filter="YAML files (*.yaml *.yml)")
         self.help_dialog = QMessageBox(
             text="""j: back 10s
 k/SPACE: play/pause
@@ -109,8 +113,8 @@ Right-click to remove a bounding box"""
         self.seek_backward_button.clicked.connect(self.seek_backward)
         self.play_button.clicked.connect(self.pause_play)
         self.seek_forward_button.clicked.connect(self.seek_forward)
-        self.load_labels_button.clicked.connect(self.file_dialog.show)
-        self.file_dialog.fileSelected.connect(self.load_labels_file)
+        self.load_labels_button.clicked.connect(self.yaml_dialog.show)
+        self.yaml_dialog.fileSelected.connect(self.load_labels_file)
         self.label_selector.currentTextChanged.connect(self.set_current_label)
         self.help_button.clicked.connect(self.help_dialog.show)
         self.save_button.clicked.connect(self.save_bounding_boxes)
@@ -139,6 +143,10 @@ Right-click to remove a bounding box"""
         if self.current_video is None:
             return
 
+        if self.output_folder is None:
+            folder = str(QFileDialog.getExistingDirectory(self, "Select Output Folder"))
+            self.output_folder = folder
+
         labels = []
         for i in range(self.label_selector.count()):
             labels.append(self.label_selector.itemText(i))
@@ -146,7 +154,7 @@ Right-click to remove a bounding box"""
         video = cv2.VideoCapture(self.video_window.fname)
         video.set(cv2.CAP_PROP_POS_MSEC, self.video_window.position)
         success, image = video.read()
-        fname = f"{self.current_video}_{self.video_window.position}"
+        fname = f"{folder}/{self.current_video}_{self.video_window.position}"
         if success:
             cv2.imwrite(fname + ".png", image)
         with open(fname + ".txt", "w") as f:
