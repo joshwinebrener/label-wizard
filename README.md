@@ -1,5 +1,7 @@
 # Label-Wizard
 
+Downloads YouTube videos to annotate with bounding boxes for object detection.
+
 ![alt text](https://github.com/joshwinebrener/label-wizard/blob/master/screenshot.png?raw=true)
 
 - [Label-Wizard](#label-wizard)
