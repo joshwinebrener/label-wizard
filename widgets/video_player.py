@@ -27,8 +27,8 @@ from PySide6.QtWidgets import (
     QGraphicsScene,
 )
 
+import cv2
 import yaml
-
 from pytube import YouTube
 from pytube.exceptions import VideoPrivate
 
@@ -116,6 +116,8 @@ Right-click to remove a bounding box"""
         self.help_button.clicked.connect(self.help_dialog.show)
         self.save_button.clicked.connect(self.save_bounding_boxes)
 
+        self.current_video = None
+
     @Slot()
     def set_current_label(self, label):
         for i in range(self.label_selector.count()):
@@ -135,12 +137,19 @@ Right-click to remove a bounding box"""
 
     @Slot()
     def save_bounding_boxes(self):
+        if self.current_video is None:
+            return
+
         labels = []
         for i in range(self.label_selector.count()):
             labels.append(self.label_selector.itemText(i))
 
-        uname = pwd.getpwuid(os.getuid())[0]
-        fname = f"{uname}_{time.strftime('%Y%m%d_%H-%M-%S')}"
+        video = cv2.VideoCapture(self.video_window.fname)
+        video.set(cv2.CAP_PROP_POS_MSEC, self.video_window.position)
+        success, image = video.read()
+        fname = f"{self.current_video}_{self.video_window.position}"
+        if success:
+            cv2.imwrite(fname + ".png", image)
         with open(fname + ".txt", "w") as f:
             for label in self.video_window.scene.rectangles:
                 label_id = -1
@@ -154,8 +163,6 @@ Right-click to remove a bounding box"""
                     t = min(rect.rect().y(), rect.rect().y() + rect.rect().height())
                     b = max(rect.rect().y(), rect.rect().y() + rect.rect().height())
                     f.writelines([f"{label_id} {l} {t} {r} {b}\n"])
-
-        print(uname)
 
     def pause_play(self):
         if self.video_window.paused:
@@ -210,7 +217,8 @@ Right-click to remove a bounding box"""
             self.loading.hide()
             return
 
-        fname = f"{os.getcwd()}/{FNAME_PREFIX}{yt.watch_url.split('=')[1]}.mp4"
+        self.current_video = yt.watch_url.split("=")[1]
+        fname = f"{os.getcwd()}/{FNAME_PREFIX}{self.current_video}.mp4"
         if not os.path.exists(fname):
             fsize_mb = chosen_stream.filesize_approx // (1024 * 1024)
             self.loading.setRange(0, fsize_mb)
@@ -340,7 +348,7 @@ class DrawableGraphicsScene(QGraphicsScene):
         self.rectangles = {}
         self.markers = {}
         self.click_point = None
-        self.current_label = "chicken"
+        self.current_label = "?"
         self.unique_color = None
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
