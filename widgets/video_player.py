@@ -144,8 +144,7 @@ Right-click to remove a bounding box"""
             return
 
         if self.output_folder is None:
-            folder = str(QFileDialog.getExistingDirectory(self, "Select Output Folder"))
-            self.output_folder = folder
+            self.output_folder = str(QFileDialog.getExistingDirectory(self, "Select Output Folder"))
 
         labels = []
         for i in range(self.label_selector.count()):
@@ -154,7 +153,7 @@ Right-click to remove a bounding box"""
         video = cv2.VideoCapture(self.video_window.fname)
         video.set(cv2.CAP_PROP_POS_MSEC, self.video_window.position)
         success, image = video.read()
-        fname = f"{folder}/{self.current_video}_{self.video_window.position}"
+        fname = f"{self.output_folder}/{self.current_video}_{self.video_window.position}"
         if success:
             cv2.imwrite(fname + ".png", image)
         with open(fname + ".txt", "w") as f:
