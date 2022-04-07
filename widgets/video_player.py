@@ -157,6 +157,14 @@ Right-click to remove a bounding box"""
         if success:
             cv2.imwrite(fname + ".png", image)
         with open(fname + ".txt", "w") as f:
+            frame_width, frame_height = (
+                self.video_window.scene.items()[-1].boundingRect().width(),
+                self.video_window.scene.items()[-1].boundingRect().height(),
+            )
+            frame_x_offset, frame_y_offset = (
+                self.video_window.scene.items()[-1].boundingRect().x(),
+                self.video_window.scene.items()[-1].boundingRect().y(),
+            )
             for label in self.video_window.scene.rectangles:
                 label_id = -1
                 if label in labels:
@@ -164,11 +172,13 @@ Right-click to remove a bounding box"""
                 else:
                     continue
                 for rect in self.video_window.scene.rectangles[label]:
-                    l = min(rect.rect().x(), rect.rect().x() + rect.rect().width())
-                    r = max(rect.rect().x(), rect.rect().x() + rect.rect().width())
-                    t = min(rect.rect().y(), rect.rect().y() + rect.rect().height())
-                    b = max(rect.rect().y(), rect.rect().y() + rect.rect().height())
-                    f.writelines([f"{label_id} {l} {t} {r} {b}\n"])
+                    x = (2 * rect.rect().x() + rect.rect().width()) / 2 - frame_x_offset
+                    x /= frame_width
+                    y = (2 * rect.rect().y() + rect.rect().height()) / 2 - frame_y_offset
+                    y /= frame_height
+                    w = rect.rect().width() / frame_width
+                    h = rect.rect().height() / frame_height
+                    f.writelines([f"{label_id} {x} {y} {w} {h}\n"])
 
     def pause_play(self):
         if self.video_window.paused:
@@ -359,6 +369,20 @@ class DrawableGraphicsScene(QGraphicsScene):
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
+            # Disregard any clicks outside the video region
+            width, height = (
+                self.items()[-1].boundingRect().width(),
+                self.items()[-1].boundingRect().height(),
+            )
+            x_offset, y_offset = self.items()[-1].x(), self.items()[-1].boundingRect().y()
+            if (
+                event.scenePos().x() < x_offset
+                or event.scenePos().x() > x_offset + width
+                or event.scenePos().y() < y_offset
+                or event.scenePos().y() > y_offset + height
+            ):
+                return
+
             self.click_point = event.scenePos()
             next_rect = QGraphicsRectItem(self.click_point.x(), self.click_point.y(), 0, 0)
             r = sigmoid(hash(self.current_label) / (1 << 63)) * 255
@@ -401,17 +425,40 @@ class DrawableGraphicsScene(QGraphicsScene):
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self.click_point is not None:
+            width, height = (
+                self.items()[-1].boundingRect().width(),
+                self.items()[-1].boundingRect().height(),
+            )
+            x_offset, y_offset = (
+                self.items()[-1].boundingRect().x(),
+                self.items()[-1].boundingRect().y(),
+            )
+
+            x = event.scenePos().x()
+            if x < x_offset:
+                x = x_offset
+            elif x > x_offset + width:
+                x = x_offset + width
+
+            y = event.scenePos().y()
+            if y < y_offset:
+                y = y_offset
+            elif y > y_offset + height:
+                y = y_offset + height
+
             self.rectangles[self.current_label][-1].setRect(
                 self.click_point.x(),
                 self.click_point.y(),
-                event.scenePos().x() - self.click_point.x(),
-                event.scenePos().y() - self.click_point.y(),
+                x - self.click_point.x(),
+                y - self.click_point.y(),
             )
 
         return super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
+            if self.click_point is None:
+                return
             if (
                 abs(event.scenePos().x() - self.click_point.x()) < 10
                 and abs(event.scenePos().y() - self.click_point.y()) < 10
