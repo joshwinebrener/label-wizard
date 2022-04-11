@@ -99,7 +99,7 @@ class ThumbnailGallery(QWidget):
         self.render_thumbnails()
 
     def begin_loading_tag(self, tag: str):
-        if tag != self.current_tag:
+        if not tag or tag != self.current_tag:
             self.clear_thumbnails()
             self.current_tag = tag
 

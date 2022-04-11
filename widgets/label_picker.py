@@ -28,7 +28,7 @@ class LabelPicker(QWidget):
         self.completer = QCompleter([])
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.label_picker = QLineEdit()
-        self.label_picker.setPlaceholderText("video category")
+        self.label_picker.setPlaceholderText("category/url")
         self.label_picker.setCompleter(self.completer)
         self.submit_button = QPushButton("submit")
 
@@ -96,5 +96,8 @@ class LabelPicker(QWidget):
             tag = self.yt8m_client.labels[label][0]
             self.fetch_thread = Thread(target=self.fetch_next_ten_urls_for_tag, args=(tag,))
             self.fetch_thread.start()
+        elif "https://www.youtube.com/watch" in label:
+            self.fetching_urls.emit(None)
+            self.urls_ready.emit([label])
         else:
             print("not a valid label")
