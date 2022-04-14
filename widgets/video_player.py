@@ -176,8 +176,8 @@ Right-click to remove a bounding box"""
                     x /= frame_width
                     y = (2 * rect.rect().y() + rect.rect().height()) / 2 - frame_y_offset
                     y /= frame_height
-                    w = rect.rect().width() / frame_width
-                    h = rect.rect().height() / frame_height
+                    w = abs(rect.rect().width() / frame_width)
+                    h = abs(rect.rect().height() / frame_height)
                     f.writelines([f"{label_id} {x} {y} {w} {h}\n"])
 
     def pause_play(self):
@@ -216,7 +216,7 @@ Right-click to remove a bounding box"""
         try:
             audio_video_streams = yt.streams.filter(progressive=True)
         except Exception as e:
-            print(e)
+            print(f"error retrieving YouTube streams for {yt.watch_url}:\n    {e}")
             self.loading.hide()
             return
 
