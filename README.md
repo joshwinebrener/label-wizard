@@ -9,8 +9,8 @@ Downloads YouTube videos to annotate with bounding boxes for object detection.
   - [Running](#running)
   - [Building](#building)
   - [Known Issues](#known-issues)
-    - [PyTube Error `urllib.error.HTTPError: HTTP Error 410: Gone`](#pytube-error-urlliberrorhttperror-http-error-410-gone)
     - [PyTube Error `'NoneType' object has no attribute 'span'`](#pytube-error-nonetype-object-has-no-attribute-span)
+    - [PyTube Error `get_throttling_function_name: could not find match for multiple`](#pytube-error-get_throttling_function_name-could-not-find-match-for-multiple)
 
 ## Intalling requirements
 
@@ -32,15 +32,12 @@ pyinstaller --onefile labelwizard.py
 
 ## Known Issues
 
-### PyTube Error `urllib.error.HTTPError: HTTP Error 410: Gone`
-
-Revert PyTube versions.
-
-```
-pip uninstall pytube
-pip install pytube==11.0.1
-```
-
 ### PyTube Error `'NoneType' object has no attribute 'span'`
 
 https://github.com/pytube/pytube/issues/1243#issuecomment-1032242549
+
+### PyTube Error `get_throttling_function_name: could not find match for multiple`
+
+```
+https://stackoverflow.com/a/71890638
+```
