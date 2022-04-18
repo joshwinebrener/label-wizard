@@ -90,7 +90,7 @@ class ThumbnailGallery(QWidget):
             pix = QPixmap(fname)
             os.remove(fname)
         except Exception as e:
-            print(e)
+            print(f"error retrieving video: {e}")
             pix = QPixmap(YOUTUBE_LOGO_FNAME)
         return pix
 
