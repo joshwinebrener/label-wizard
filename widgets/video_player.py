@@ -1,5 +1,6 @@
 import os
 import pwd
+from termios import ECHOE
 import time
 from threading import Thread
 import math
@@ -10,6 +11,7 @@ from PySide6.QtCore import Qt, Signal, Slot, QUrl, QSize, QTimer
 from PySide6.QtGui import QPainter, QResizeEvent, QKeyEvent, QIcon, QMouseEvent, QColor, QFont
 from PySide6.QtWidgets import (
     QGraphicsRectItem,
+    QGraphicsLineItem,
     QComboBox,
     QMessageBox,
     QFileDialog,
@@ -297,6 +299,7 @@ class VideoWindow(QWidget):
 
         self.video_graphics = QGraphicsVideoItem()
         self.video_graphics.setAspectRatioMode(Qt.KeepAspectRatio)
+        self.video_graphics.setAcceptHoverEvents(True)
         self.scene = DrawableGraphicsScene(self)
         self.scene.addItem(self.video_graphics)
         self.scene.setBackgroundBrush(Qt.white)
@@ -366,6 +369,11 @@ class DrawableGraphicsScene(QGraphicsScene):
         self.click_point = None
         self.current_label = "?"
         self.unique_color = None
+        self.crosshairs_color = QColor(128, 128, 128, 128)
+        self.crosshairs_h = QGraphicsLineItem(0, 0, 0, 0)
+        self.crosshairs_h.setPen(self.crosshairs_color)
+        self.crosshairs_v = QGraphicsLineItem(0, 0, 0, 0)
+        self.crosshairs_v.setPen(self.crosshairs_color)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
@@ -424,6 +432,16 @@ class DrawableGraphicsScene(QGraphicsScene):
         return super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+        x = event.scenePos().x()
+        y = event.scenePos().y()
+
+        # Draw crosshairs
+        self.crosshairs_h.setLine(0, y, self.width(), y)
+        self.crosshairs_v.setLine(x, 0, x, self.height())
+        if self.crosshairs_h not in self.items() or self.crosshairs_v not in self.items():
+            self.addItem(self.crosshairs_h)
+            self.addItem(self.crosshairs_v)
+
         if self.click_point is not None:
             width, height = (
                 self.items()[-1].boundingRect().width(),
@@ -434,13 +452,11 @@ class DrawableGraphicsScene(QGraphicsScene):
                 self.items()[-1].boundingRect().y(),
             )
 
-            x = event.scenePos().x()
             if x < x_offset:
                 x = x_offset
             elif x > x_offset + width:
                 x = x_offset + width
 
-            y = event.scenePos().y()
             if y < y_offset:
                 y = y_offset
             elif y > y_offset + height:
